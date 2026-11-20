@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DISEB | Historial de Diagnósticos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-300 font-sans overflow-x-hidden">
+
+    <!-- MENÚ LATERAL (Mismo diseño, pero con 'Historial' resaltado) -->
+    <div class="fixed top-0 left-0 h-screen w-64 bg-slate-950 border-r border-slate-800 flex flex-col pt-4">
+        <h3 class="text-white text-center font-bold text-2xl mb-8 mt-4">
+            <i class="fa-solid fa-car-battery text-blue-500"></i> DISEB
+        </h3>
+        
+        <nav class="flex-1 space-y-1">
+            <a href="index.html" class="block py-4 px-6 text-slate-400 hover:text-white hover:bg-slate-800/50 hover:border-l-4 border-transparent hover:border-slate-600 transition-all">
+                <i class="fa-solid fa-stethoscope w-6 text-center mr-2"></i> Diagnóstico
+            </a>
+            <!-- Opción Historial Activa -->
+            <a href="historial.html" class="block py-4 px-6 text-white bg-slate-800 border-l-4 border-blue-500 transition-colors">
+                <i class="fa-solid fa-clock-rotate-left w-6 text-center mr-2"></i> Historial
+            </a>
+            <a href="reportes.html" class="block py-4 px-6 text-slate-400 hover:text-white hover:bg-slate-800/50 hover:border-l-4 border-transparent hover:border-slate-600 transition-all">
+                <i class="fa-solid fa-chart-column w-6 text-center mr-2"></i> Reportes
+            </a>
+            <a href="#" class="block py-4 px-6 text-slate-400 hover:text-white hover:bg-slate-800/50 hover:border-l-4 border-transparent hover:border-slate-600 transition-all">
+                <i class="fa-solid fa-gear w-6 text-center mr-2"></i> Configuración
+            </a>
+        </nav>
+        
+        <div class="mt-auto p-6 text-center text-slate-500 text-sm border-t border-slate-800">
+            <i class="fa-regular fa-circle-user text-3xl mb-2 text-slate-400"></i><br>
+            Taller Mecánico Central<br>
+            <span class="text-xs">v1.0.0</span>
+        </div>
+    </div>
+
+    <!-- ÁREA PRINCIPAL -->
+    <div class="ml-64 p-8 min-h-screen">
+        
+        <!-- Cabecera -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h2 class="text-2xl font-bold text-white mb-1">Historial de Diagnósticos</h2>
+                <p class="text-slate-400 text-sm">Registro local de todas las telemetrías evaluadas por el modelo.</p>
+            </div>
+            <div class="space-x-3">
+                <button onclick="limpiarHistorial()" class="bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/30 font-medium py-2.5 px-4 rounded-lg transition-all text-sm">
+                    <i class="fa-solid fa-trash-can mr-2"></i> Borrar Todo
+                </button>
+                <button onclick="exportarExcelDesdeHistorial()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 px-4 rounded-lg shadow transition-all text-sm">
+                    <i class="fa-solid fa-file-excel mr-2"></i> Exportar CSV
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabla de Datos -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm whitespace-nowrap">
+                    <thead class="bg-slate-900/50 text-slate-400 uppercase text-xs font-semibold">
+                        <tr>
+                            <th class="px-6 py-4">Fecha y Hora</th>
+                            <th class="px-6 py-4">Vehículo</th>
+                            <th class="px-6 py-4">Química</th>
+                            <th class="px-6 py-4 text-center">Odómetro</th>
+                            <th class="px-6 py-4 text-center">Ciclos</th>
+                            <th class="px-6 py-4 text-center">SoH Estimado</th>
+                            <th class="px-6 py-4">Estado Crítico</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-historial" class="divide-y divide-slate-700/50">
+                        <!-- Las filas se insertarán aquí con JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Mensaje de estado vacío -->
+            <div id="mensaje-vacio" class="hidden p-8 text-center text-slate-500">
+                <i class="fa-solid fa-folder-open text-4xl mb-3 opacity-50"></i>
+                <p>No hay diagnósticos guardados en la memoria local.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script para cargar los datos en la tabla -->
+    <script>
+        // Al cargar la página, leemos la memoria local
+        document.addEventListener('DOMContentLoaded', () => {
+            cargarTabla();
+        });
+
+        function cargarTabla() {
+            const historial = JSON.parse(localStorage.getItem('diseb_historial')) || [];
+            const tbody = document.getElementById('tabla-historial');
+            const mensajeVacio = document.getElementById('mensaje-vacio');
+            
+            tbody.innerHTML = ''; // Limpiamos la tabla
+            
+            if (historial.length === 0) {
+                mensajeVacio.classList.remove('hidden');
+            } else {
+                mensajeVacio.classList.add('hidden');
+                
+                // Recorremos el historial al revés para ver los más recientes arriba
+                historial.slice().reverse().forEach(row => {
+                    // Elegir color según el estado
+                    let colorBadge = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+                    if (row.estado.includes("PREVENTIVO")) colorBadge = "bg-amber-500/20 text-amber-400 border-amber-500/30";
+                    if (row.estado.includes("CRÍTICO")) colorBadge = "bg-red-500/20 text-red-400 border-red-500/30";
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-700/30 transition-colors text-slate-300";
+                    tr.innerHTML = `
+                        <td class="px-6 py-4">${row.fecha}</td>
+                        <td class="px-6 py-4 font-medium text-white">${row.marca}</td>
+                        <td class="px-6 py-4"><span class="bg-slate-700 px-2 py-1 rounded text-xs">${row.quimica}</span></td>
+                        <td class="px-6 py-4 text-center">${Number(row.odometro).toLocaleString()} km</td>
+                        <td class="px-6 py-4 text-center">${row.ciclos}</td>
+                        <td class="px-6 py-4 text-center font-bold text-white">${row.soh}%</td>
+                        <td class="px-6 py-4">
+                            <span class="px-3 py-1 rounded-full text-xs font-semibold border ${colorBadge}">
+                                ${row.estado}
+                            </span>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        // Función para borrar todo
+        function limpiarHistorial() {
+            if(confirm("¿Estás seguro de que deseas borrar todo el historial? Esto no se puede deshacer.")) {
+                localStorage.removeItem('diseb_historial');
+                cargarTabla();
+            }
+        }
+
+        // Función para exportar desde esta pantalla
+        function exportarExcelDesdeHistorial() {
+            const historial = JSON.parse(localStorage.getItem('diseb_historial')) || [];
+            if (historial.length === 0) {
+                alert("No hay datos para exportar.");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Fecha,Marca,Quimica,Odometro,Ciclos,Terreno,Carga,SoH_Estimado,Estado\n";
+
+            historial.forEach(row => {
+                let fila = [
+                    `"${row.fecha}"`, `"${row.marca}"`, `"${row.quimica}"`, row.odometro, row.ciclos,
+                    `"${row.terreno}"`, `"${row.metodoCarga}"`, row.soh, `"${row.estado}"`
+                ];
+                csvContent += fila.join(",") + "\n";
+            });
+
+            const link = document.createElement("a");
+            link.setAttribute("href", encodeURI(csvContent));
+            link.setAttribute("download", "Historial_DISEB.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
