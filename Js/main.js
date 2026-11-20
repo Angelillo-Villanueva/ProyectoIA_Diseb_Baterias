@@ -1,8 +1,50 @@
 // Variables globales para destruir gráficas viejas si se calcula varias veces
 let chartDona = null;
 let chartCurva = null;
+let chartMarcasGlobal = null;
+let chartQuimicaGlobal = null;
 
-// Lógica de conversión automática de meses a años
+// Opciones dinámicas según el Régimen de Uso
+const opcionesUso = {
+    Private: [
+        { valor: "Privado_Ocasional", texto: "Uso Ocasional / Fin de semana" },
+        { valor: "Privado_Diario", texto: "Uso Diario (Casa - Trabajo / Escuela)" },
+        { valor: "Privado_Carretera", texto: "Viajes Largos / Carretera Frecuente" }
+    ],
+    Fleet: [
+        { valor: "Comercial_App", texto: "Plataforma de Transporte (Uber / DiDi)" },
+        { valor: "Comercial_Reparto", texto: "Reparto / Logística Urbana" },
+        { valor: "Comercial_Intensivo", texto: "Taxi / Flotilla Continua (24/7)" }
+    ]
+};
+
+function actualizarSubUso() {
+    const regimenEl = document.getElementById('regimen');
+    const selectSubUso = document.getElementById('uso-especifico');
+    if (!regimenEl || !selectSubUso) return;
+
+    const regimen = regimenEl.value;
+    selectSubUso.innerHTML = "";
+    opcionesUso[regimen].forEach(op => {
+        const option = document.createElement("option");
+        option.value = op.valor;
+        option.textContent = op.texto;
+        selectSubUso.appendChild(option);
+    });
+}
+
+// Inicializar gráficas y selector dependiente al cargar la página
+document.addEventListener('DOMContentLoaded', () => {
+    actualizarSubUso();
+    actualizarDashboardAnalitica();
+});
+
+// Reiniciar selector dependiente al limpiar el formulario
+document.getElementById('formulario-diagnostico').addEventListener('reset', () => {
+    setTimeout(actualizarSubUso, 10);
+});
+
+// Lógica de conversión automática de meses a años[cite: 12]
 document.getElementById('meses').addEventListener('input', function() {
     let meses = parseInt(this.value) || 0;
     if (meses >= 12) {
@@ -13,41 +55,32 @@ document.getElementById('meses').addEventListener('input', function() {
     }
 });
 
-// Lógica Principal de Diagnóstico conectada a la IA (Python / Flask)
+// Lógica Principal de Diagnóstico conectada a la IA (Python / Flask)[cite: 12]
 document.getElementById('formulario-diagnostico').addEventListener('submit', async function(e) {
     e.preventDefault(); 
     
-    // 1. Obtener valores básicos del formulario
+    // 1. Obtener valores del formulario[cite: 12]
     const odometro = parseFloat(document.getElementById('odometro').value) || 0;
     const anios = parseInt(document.getElementById('anios').value) || 0;
     const meses = parseInt(document.getElementById('meses').value) || 0;
-    
-    // 2. Capturar los campos del Cliente y Mecánico
     const terreno = document.getElementById('terreno') ? document.getElementById('terreno').value : 'Plano';
     const metodoCarga = document.getElementById('metodo-carga') ? document.getElementById('metodo-carga').value : 'Lenta';
     const marca = document.getElementById('marca').value;
     const quimica = document.getElementById('quimica').value;
     const regimen = document.getElementById('regimen').value;
-    
-    const inputCiclos = document.getElementById('ciclos');
-    const ciclos = (inputCiclos && inputCiclos.value !== "") ? parseFloat(inputCiclos.value) : (odometro / 250);
-    
-    const inputRefri = document.getElementById('refrigeracion');
-    const refrigeracion = inputRefri ? inputRefri.value : 'Optimo';
-    
-    const inputAlertas = document.getElementById('alertas');
-    const alertas = inputAlertas ? inputAlertas.value : 'Ninguna';
+    const usoEspecifico = document.getElementById('uso-especifico').value;
+    const ciclos = odometro / 250;
 
-    // Cambiar visualmente el botón a estado de carga
+    // Cambiar visualmente el botón a estado de carga[cite: 12]
     const btnSubmit = e.target.querySelector('button[type="submit"]');
     const textoOriginal = btnSubmit.innerHTML;
     btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Sincronizando motor de IA...';
 
     try {
-        // --- PAUSA ARTIFICIAL DE 3 SEGUNDOS PARA LA PRESENTACIÓN ---
+        // --- PAUSA ARTIFICIAL DE 3 SEGUNDOS PARA LA PRESENTACIÓN ---[cite: 12]
         await new Promise(resolve => setTimeout(resolve, 3000));
 
-        // 3. ENVIAR DATOS A PYTHON POR DEBAJO DEL AGUA (API Flask)
+        // 2. ENVIAR DATOS A PYTHON (API Flask)[cite: 12]
         const respuesta = await fetch('http://127.0.0.1:5000/predict', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -60,6 +93,7 @@ document.getElementById('formulario-diagnostico').addEventListener('submit', asy
                 quimica: quimica,
                 metodoCarga: metodoCarga,
                 regimen: regimen,
+                usoEspecifico: usoEspecifico,
                 ciclos: ciclos
             })
         });
@@ -72,27 +106,27 @@ document.getElementById('formulario-diagnostico').addEventListener('submit', asy
         const soh_estimado = resultadoIA.soh_estimado;
         const prediccionFalla = resultadoIA.prediccion_falla;
 
-        // 4. Evaluar Criticidad (Semáforo) basado en la IA real
+        // 3. Evaluar Criticidad (Semáforo) basado en la IA real[cite: 12]
         let colorBorde, textoEstado, descEstado, colorGrafica;
         
         if (soh_estimado >= 80.0 && prediccionFalla === 0) {
             textoEstado = "🟢 ESTADO: ÓPTIMO";
             descEstado = "La batería opera en condiciones seguras según el modelo predictivo de IA.";
-            colorBorde = "#10b981"; // Verde
+            colorBorde = "#10b981";
             colorGrafica = "#10b981";
         } else if (soh_estimado >= 70.0) {
             textoEstado = "🟡 ESTADO: PREVENTIVO";
             descEstado = "Se detecta desgaste moderado. Se sugiere programar mantenimiento preventivo.";
-            colorBorde = "#f59e0b"; // Amarillo
+            colorBorde = "#f59e0b";
             colorGrafica = "#f59e0b";
         } else {
             textoEstado = "🔴 ESTADO: CRÍTICO";
             descEstado = "Alto riesgo de fallo inminente detectado por la red de Machine Learning.";
-            colorBorde = "#ef4444"; // Rojo
+            colorBorde = "#ef4444";
             colorGrafica = "#ef4444";
         }
 
-        // 5. Guardar en el Historial Local del navegador
+        // 4. Guardar en el Historial Local y refrescar el dashboard superior en vivo
         guardarEnHistorial({
             marca: marca,
             quimica: quimica,
@@ -100,11 +134,13 @@ document.getElementById('formulario-diagnostico').addEventListener('submit', asy
             ciclos: ciclos,
             terreno: terreno,
             metodoCarga: metodoCarga,
+            usoEspecifico: usoEspecifico,
             soh: soh_estimado.toFixed(2),
             estado: textoEstado.replace(/🟢|🟡|🔴/g, '').trim()
         });
+        actualizarDashboardAnalitica();
 
-        // 6. Actualizar la interfaz HTML (DOM)
+        // 5. Actualizar la interfaz HTML (DOM)[cite: 12]
         document.getElementById('texto-estado').innerText = textoEstado;
         document.getElementById('desc-estado').innerText = descEstado;
         document.getElementById('res-tiempo').innerText = `${anios} años y ${meses} meses`;
@@ -113,12 +149,11 @@ document.getElementById('formulario-diagnostico').addEventListener('submit', asy
         const tarjetaSemaforo = document.getElementById('tarjeta-semaforo');
         tarjetaSemaforo.style.border = `2px solid ${colorBorde}`;
         
-        // Mostrar sección de resultados con desplazamiento suave
         const seccionResultados = document.getElementById('seccion-resultados');
         seccionResultados.classList.remove('hidden');
         seccionResultados.scrollIntoView({ behavior: 'smooth' });
 
-        // 7. Renderizar Gráficas con Chart.js
+        // 6. Renderizar Gráficas de Resultados[cite: 12]
         renderizarGraficas(soh_estimado, anios, colorGrafica);
 
     } catch (error) {
@@ -128,6 +163,82 @@ document.getElementById('formulario-diagnostico').addEventListener('submit', asy
         btnSubmit.innerHTML = textoOriginal;
     }
 });
+
+// --- DASHBOARD SUPERIOR (KPIs + GRÁFICAS GLOBALES) ---
+function actualizarDashboardAnalitica() {
+    const elTotal = document.getElementById('kpi-total');
+    if (!elTotal) return;
+
+    const historial = JSON.parse(localStorage.getItem('diseb_historial')) || [];
+    const total = historial.length;
+    elTotal.innerText = total;
+
+    if (total > 0) {
+        const sumaSoH = historial.reduce((acc, curr) => acc + parseFloat(curr.soh), 0);
+        document.getElementById('kpi-promedio').innerText = (sumaSoH / total).toFixed(1) + '%';
+        
+        const criticos = historial.filter(item => item.estado.includes("CRÍTICO")).length;
+        document.getElementById('kpi-criticos').innerText = criticos;
+    } else {
+        document.getElementById('kpi-promedio').innerText = '0%';
+        document.getElementById('kpi-criticos').innerText = '0';
+    }
+
+    const conteoMarcas = {};
+    const conteoQuimicas = {};
+
+    historial.forEach(item => {
+        conteoMarcas[item.marca] = (conteoMarcas[item.marca] || 0) + 1;
+        conteoQuimicas[item.quimica] = (conteoQuimicas[item.quimica] || 0) + 1;
+    });
+
+    if (chartMarcasGlobal) chartMarcasGlobal.destroy();
+    if (chartQuimicaGlobal) chartQuimicaGlobal.destroy();
+
+    const ctxMarcas = document.getElementById('chartMarcas').getContext('2d');
+    chartMarcasGlobal = new Chart(ctxMarcas, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(conteoMarcas).length ? Object.keys(conteoMarcas) : ['Sin datos'],
+            datasets: [{
+                label: 'Vehículos',
+                data: Object.values(conteoMarcas).length ? Object.values(conteoMarcas) : [0],
+                backgroundColor: '#06b6d4',
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', stepSize: 1 } },
+                x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+            }
+        }
+    });
+
+    const ctxQuimica = document.getElementById('chartQuimica').getContext('2d');
+    chartQuimicaGlobal = new Chart(ctxQuimica, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(conteoQuimicas).length ? Object.keys(conteoQuimicas) : ['Sin datos'],
+            datasets: [{
+                data: Object.values(conteoQuimicas).length ? Object.values(conteoQuimicas) : [1],
+                backgroundColor: Object.keys(conteoQuimicas).length 
+                    ? ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6'] 
+                    : ['#1e293b'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } }
+        }
+    });
+}
 
 function renderizarGraficas(soh, anios_uso, colorPrincipal) {
     if (chartDona) chartDona.destroy();
@@ -187,7 +298,7 @@ function renderizarGraficas(soh, anios_uso, colorPrincipal) {
                 {
                     label: 'Estrés Operativo',
                     data: estres,
-                    backgroundColor: 'rgba(59, 130, 246, 0.4)',
+                    backgroundColor: 'rgba(6, 182, 212, 0.4)',
                     type: 'bar',
                     order: 1
                 }
@@ -207,8 +318,7 @@ function renderizarGraficas(soh, anios_uso, colorPrincipal) {
     });
 }
 
-// --- SISTEMA DE ALMACENAMIENTO Y EXPORTACIÓN A EXCEL ---
-
+// --- SISTEMA DE ALMACENAMIENTO Y EXPORTACIÓN A EXCEL ---[cite: 12]
 function guardarEnHistorial(datos) {
     let historial = JSON.parse(localStorage.getItem('diseb_historial')) || [];
     datos.fecha = new Date().toLocaleString();
@@ -225,7 +335,7 @@ window.exportarExcel = function() {
     }
 
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Fecha,Marca,Quimica,Odometro,Ciclos,Terreno,Carga,SoH_Estimado,Estado\n";
+    csvContent += "Fecha,Marca,Quimica,Odometro,Ciclos,Terreno,Carga,ModalidadUso,SoH_Estimado,Estado\n";
 
     historial.forEach(row => {
         let fila = [
@@ -236,6 +346,7 @@ window.exportarExcel = function() {
             row.ciclos,
             `"${row.terreno}"`,
             `"${row.metodoCarga}"`,
+            `"${row.usoEspecifico || 'N/A'}"`,
             row.soh,
             `"${row.estado}"`
         ];
